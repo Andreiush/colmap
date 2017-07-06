@@ -39,6 +39,14 @@ struct LRToptions {
   size_t min_num_trials = 0;
   size_t max_num_trials = std::numeric_limits<size_t>::max();
 
+  //bucket size for bailout
+  size_t B;
+
+  //range for sigma search
+  double sigma_min;
+  double sigma_max;
+  double delta_sigma;
+
   void Check() const {
     CHECK_GT(c, 0);
     CHECK_GE(beta, 0);
@@ -52,13 +60,14 @@ struct LRToptions {
     CHECK_GE(confidence, 0);
     CHECK_LE(confidence, 1);
     CHECK_LE(min_num_trials, max_num_trials);
+    CHECK_GT(B, 0);
   }
 };
 
 template <typename Estimator, typename SupportMeasurer = InlierSupportMeasurer,
           typename Sampler = RandomSampler>
 class LRTsac {
- public:
+public:
   struct Report {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -98,17 +107,17 @@ class LRTsac {
   Sampler sampler;
   SupportMeasurer support_measurer;
 
- protected:
+protected:
   LRToptions options_;
 
-  inline void makeSigmas(std::vector<double> &sigmas, double sigma_min, double sigma_max, double delta_sigma);
-  inline double area(int dim, double D, double A, double sigma);
-  inline double LRT(double p_s, double eps, int n);
+  inline void makeSigmas(std::vector<double> &sigmas);
+  inline double area(double sigma);
+  inline double LRT(double ps, double eps, double n);
   double bisectionForEps(double sigma, double c, int n);
-  size_t iterations(double eps, double conf, double beta, int nSample);
-  inline void makeTaos(std::vector<double> &taos, int B, int n, double beta);
-  inline void computeEps(std::vector<double> &eps, const std::vector<int> &ks, int n);
-  int iterRansac(double eps, double conf, int nSample);
+  size_t iterations(double eps);
+  inline void makeTaos(std::vector<double> &taos, int n);
+  inline void computeEps(std::vector<double> &eps, const std::vector<int> &ks,
+                         int n);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -122,32 +131,102 @@ LRTsac<Estimator, SupportMeasurer, Sampler>::LRTsac(
   options.Check();
 
   // Determine max_num_trials based on assumed `min_inlier_ratio`.
-  const size_t kNumSamples = 100000;
-  const size_t dyn_max_num_trials = ComputeNumTrials(
-                                      static_cast<size_t>(options_.min_inlier_ratio * kNumSamples), kNumSamples,
-                                      options_.confidence);
+  const size_t dyn_max_num_trials = iterations(options_.min_inlier_ratio);
   options_.max_num_trials =
       std::min<size_t>(options_.max_num_trials, dyn_max_num_trials);
 }
 
 template <typename Estimator, typename SupportMeasurer, typename Sampler>
-size_t LRTsac<Estimator, SupportMeasurer, Sampler>::ComputeNumTrials(
-    const size_t num_inliers, const size_t num_samples,
-    const double confidence) {
-  const double inlier_ratio = num_inliers / static_cast<double>(num_samples);
+inline void LRTsac<Estimator, SupportMeasurer, Sampler>::makeSigmas(
+    std::vector<double> &sigmas)
+{
+    int nSigma = (options_.sigma_max-options_.sigma_min)/options_.delta_sigma;
+    sigmas.resize(nSigma);
+    for(int i = 0; i < nSigma; ++i)
+        sigmas[i] = sigma_min+options_.delta_sigma*i;
+}
 
-  const double nom = 1 - confidence;
+template <typename Estimator, typename SupportMeasurer, typename Sampler>
+inline double LRTsac<Estimator, SupportMeasurer, Sampler>::area(double sigma)
+{
+    if(dim == 1)
+        return 2*sigma*options_.D/options_.A;
+    else
+        return M_PI*(sigma*sigma)/(options_.D);
+}
+
+template <typename Estimator, typename SupportMeasurer, typename Sampler>
+inline double LRTsac<Estimator, SupportMeasurer, Sampler>::LRT(double p_s,
+                                                               double eps,
+                                                               int n)
+{
+    double a = eps*std::log(eps/p_s);
+    double b = (1-eps)*(std::log(1-eps)/(1-p_s));
+    return 2*n*(a+b);
+}
+
+template <typename Estimator, typename SupportMeasurer, typename Sampler>
+double LRTsac<Estimator, SupportMeasurer, Sampler>::bisectionForEps(double p_s,
+                                                                    double c,
+                                                                    int n)
+{
+    double a = p_s;
+    double b = 1;
+    double m = (a+b)/2.0;
+    double val = LRT(p_s,m,n);
+    while (abs(val-c) > 0.01)
+    {
+        if(val > c)
+            b = m;
+        else
+            a = m;
+        m = (a+b)/2;
+        val = LRT(p_s,m,n);
+    }
+    return m;
+}
+
+
+template <typename Estimator, typename SupportMeasurer, typename Sampler>
+size_t LRTsac<Estimator, SupportMeasurer, Sampler>::iterations(double eps)
+{
+  double nom = 1 - options_.confidence;
   if (nom <= 0) {
     return std::numeric_limits<size_t>::max();
   }
-
-  const double denom = 1 - std::pow(inlier_ratio, Estimator::kMinNumSamples);
-  if (denom <= 0) {
+  double den = 1 - (std::pow(eps,Estimator::kMinNumSamples)*(1-options_.beta));
+  if (den <= 0) {
     return 1;
   }
-
-  return static_cast<size_t>(std::ceil(std::log(nom) / std::log(denom)));
+  return static_cast<size_t>(std::ceil(std::log(nom) / std::log(den)));
 }
+
+template <typename Estimator, typename SupportMeasurer, typename Sampler>
+inline void LRTsac<Estimator, SupportMeasurer, Sampler>::makeTaos(
+    std::vector<double> &taos, int n)
+{
+  int Q = std::ceil((double)n/options_.B);
+  taos.resize(Q);
+  for(int i = 0; i < Q; ++i)
+  {
+    double a = std::log((double)Q)-std::log(options_.beta);
+    double m = (i+1)*B;
+    taos[i] = std::sqrt(a/(2*m));
+  }
+}
+
+template <typename Estimator, typename SupportMeasurer, typename Sampler>
+inline void LRTsac<Estimator, SupportMeasurer, Sampler>::computeEps(
+    std::vector <double> &eps, std::vector<int> const &ks, int n)
+{
+  eps.resize(ks.size());
+  eps[0] = ks[0];
+  for(int i = 1; i < ks.size(); ++i)
+    eps[i] = eps[i-1]+ks[i];
+  for(int i = 0; i < eps.size(); ++i)
+    eps[i]/=n;
+}
+
 
 template <typename Estimator, typename SupportMeasurer, typename Sampler>
 typename LRTsac<Estimator, SupportMeasurer, Sampler>::Report
