@@ -20,7 +20,7 @@
 #include <cstddef>
 #include <limits>
 #include <vector>
-
+#include <cmath>
 namespace colmap {
 
 // Measure the support of a model by counting the number of inliers and
@@ -57,6 +57,24 @@ struct MEstimatorSupportMeasurer {
   // Compute the support of the residuals.
   Support Evaluate(const std::vector<double>& residuals,
                    const double max_residual);
+
+  // Compare the two supports and return the better support.
+  bool Compare(const Support& support1, const Support& support2);
+};
+
+// Measure the support of a model by computing its LRT given its inlier ratio and sigma (noise level). A support is better than another when its LRT is bigger (and smaller sigma if they are the same)
+struct LRTSupportMeasurer {
+  struct Support {
+    // The number of inliers.
+    double inRatio = 0;
+    double sigma = 0;
+    // The sum of all inlier residuals.
+    double LRT = std::numeric_limits<double>::min();
+  };
+
+  // Compute the LRT score
+  Support Evaluate(const double p_s, const double inRatio, const double sigma,
+                   const size_t n);
 
   // Compare the two supports and return the better support.
   bool Compare(const Support& support1, const Support& support2);
