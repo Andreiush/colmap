@@ -10,6 +10,7 @@
 #include "optim/support_measurement.h"
 #include "util/alignment.h"
 #include "util/logging.h"
+#include "util/random.h"
 
 namespace colmap {
 
@@ -140,19 +141,19 @@ template <typename Estimator, typename SupportMeasurer, typename Sampler>
 inline void LRTsac<Estimator, SupportMeasurer, Sampler>::makeSigmas(
     std::vector<double> &sigmas)
 {
-    int nSigma = (options_.sigma_max-options_.sigma_min)/options_.delta_sigma;
-    sigmas.resize(nSigma);
-    for(int i = 0; i < nSigma; ++i)
-        sigmas[i] = sigma_min+options_.delta_sigma*i;
+  int nSigma = (options_.sigma_max-options_.sigma_min)/options_.delta_sigma;
+  sigmas.resize(nSigma);
+  for(int i = 0; i < nSigma; ++i)
+    sigmas[i] = sigma_min+options_.delta_sigma*i;
 }
 
 template <typename Estimator, typename SupportMeasurer, typename Sampler>
 inline double LRTsac<Estimator, SupportMeasurer, Sampler>::area(double sigma)
 {
-    if(dim == 1)
-        return 2*sigma*options_.D/options_.A;
-    else
-        return M_PI*(sigma*sigma)/(options_.D);
+  if(dim == 1)
+    return 2*sigma*options_.D/options_.A;
+  else
+    return M_PI*(sigma*sigma)/(options_.D);
 }
 
 template <typename Estimator, typename SupportMeasurer, typename Sampler>
@@ -160,9 +161,9 @@ inline double LRTsac<Estimator, SupportMeasurer, Sampler>::LRT(double p_s,
                                                                double eps,
                                                                int n)
 {
-    double a = eps*std::log(eps/p_s);
-    double b = (1-eps)*(std::log(1-eps)/(1-p_s));
-    return 2*n*(a+b);
+  double a = eps*std::log(eps/p_s);
+  double b = (1-eps)*(std::log(1-eps)/(1-p_s));
+  return 2*n*(a+b);
 }
 
 template <typename Estimator, typename SupportMeasurer, typename Sampler>
@@ -170,20 +171,20 @@ double LRTsac<Estimator, SupportMeasurer, Sampler>::bisectionForEps(double p_s,
                                                                     double c,
                                                                     int n)
 {
-    double a = p_s;
-    double b = 1;
-    double m = (a+b)/2.0;
-    double val = LRT(p_s,m,n);
-    while (abs(val-c) > 0.01)
-    {
-        if(val > c)
-            b = m;
-        else
-            a = m;
-        m = (a+b)/2;
-        val = LRT(p_s,m,n);
-    }
-    return m;
+  double a = p_s;
+  double b = 1;
+  double m = (a+b)/2.0;
+  double val = LRT(p_s,m,n);
+  while (abs(val-c) > 0.01)
+  {
+    if(val > c)
+      b = m;
+    else
+      a = m;
+    m = (a+b)/2;
+    val = LRT(p_s,m,n);
+  }
+  return m;
 }
 
 
@@ -240,7 +241,7 @@ LRTsac<Estimator, SupportMeasurer, Sampler>::Estimate(
   Report report;
   report.success = false;
   report.num_trials = 0;
-
+  report.vpm = 0;
   if (num_samples < Estimator::kMinNumSamples) {
     return report;
   }
@@ -248,67 +249,134 @@ LRTsac<Estimator, SupportMeasurer, Sampler>::Estimate(
   typename SupportMeasurer::Support best_support;
   typename Estimator::M_t best_model;
 
-  bool abort = false;
+  std::vector<double> sigmas;
+  makeSigmas(sigmas);
+  size_t nSigmas = sigmas.size();
+  const size_t n = X.size();
 
-  const double max_residual = options_.max_error * options_.max_error;
+  std::vector<double> p_s(nSigmas);
+  for(int i = 0; i < nSigmas; ++i)
+    p_s[i] = area(sigmas[i]);
 
-  std::vector<double> residuals(num_samples);
+  std::vector<double> minEps(nSigmas);
+  for(int i = 0; i < nSigmas; ++i)
+    minEps[i] = options_.min_inlier_ratio;
+
+  size_t bucket_size = options_.B;
+  std::vector<double> residuals(1);
+
+  std::vector<double> taos;
+  makeTaos(taos,n);
 
   std::vector<typename Estimator::X_t> X_rand(Estimator::kMinNumSamples);
   std::vector<typename Estimator::Y_t> Y_rand(Estimator::kMinNumSamples);
+
+  std::vector<typename Estimator::X_t> X_test(1);
+  std::vector<typename Estimator::Y_t> Y_test(1);
+
+  std::vector<int> random_indices(num_samples);
+  std::iota(random_indices.begin(), random_indices.end(), 0);
+  Shuffle(num_samples, random_indices);
 
   sampler.Initialize(num_samples);
 
   size_t max_num_trials = options_.max_num_trials;
   max_num_trials = std::min<size_t>(max_num_trials, sampler.MaxNumSamples());
-  size_t dyn_max_num_trials = max_num_trials;
 
-  for (report.num_trials = 0; report.num_trials < max_num_trials;
-       ++report.num_trials) {
-    if (abort) {
-      report.num_trials += 1;
-      break;
-    }
 
+  size_t models_tried = 0;
+  for (report.num_trials = 0; report.num_trials < max_num_trials && nSigmas > 0;
+       ++report.num_trials)
+  {
     sampler.SampleXY(X, Y, &X_rand, &Y_rand);
 
     // Estimate model for current subset.
     const std::vector<typename Estimator::M_t> sample_models =
         estimator.Estimate(X_rand, Y_rand);
 
+    std::vector<long> numIterations(nSigmas);
+    for(int k = nSigmas-1; k >= 0; --k)
+        numIterations[k]=iterations(minEps[k]);
+
     // Iterate through all estimated models.
-    for (const auto& sample_model : sample_models) {
-      estimator.Residuals(X, Y, sample_model, &residuals);
-      CHECK_EQ(residuals.size(), X.size());
+    for (const auto& sample_model : sample_models)
+    {
+      models_tried++;
+      bool bailout = false;
+      std::vector<int> ks(nSigmas,0);
+      std::vector<double> curEps;
+      //for each data point
+      for(size_t j = 0; j < num_samples; ++j)
+      {
+        X_test[0] = X[random_indices[j]];
+        Y_test[0] = Y[random_indices[j]];
+        estimator.Residuals(X_test, Y_test, sample_model, &residuals);
+        CHECK_EQ(residuals.size(), X_test.size());
+        double err = std::sqrt(residuals[0]);
+        int ind =  std::max(ceil((err-sigma_min)/delta_sigma), 0.0);
+        report.vpm ++;
+        if(ind < nSigmas && ind >= 0)
+          ks[ind] += 1;
+        // we tested B points, check for bailout
+        if( (j != 0 && j % bucket_size == 0) || j == num_samples-1 )
+        {
+          bailout = true;
+          computeEps(curEps, ks, j+1);
+          int ind = j/bucket_size - 1;
+          for(int k = 0; k < curEps.size(); ++k)
+            if(curEps[k] >= std::max(minEps[k] - taos[ind],0.0005))
+            {
+              bailout = false;
+              break;
+            }
+          if(bailout)
+            break;
+        }
+      }//end for each point
+      //check if we didn't bailout, then we found a good model
+      if(!bailout)
+      {
+        int bestk = 0;
+        for(size_t k = 0; k < curEps.size(); ++k)
+        {
+          const auto support = support_measurer.Evaluate(p_s[k], curEps[k],
+                                                         sigma[k], n);
 
-      const auto support = support_measurer.Evaluate(residuals, max_residual);
-
-      // Save as best subset if better than all previous subsets.
-      if (support_measurer.Compare(support, best_support)) {
-        best_support = support;
-        best_model = sample_model;
-
-        dyn_max_num_trials = ComputeNumTrials(best_support.num_inliers,
-                                              num_samples, options_.confidence);
+          // Save as best subset if better than all previous subsets.
+          if (support_measurer.Compare(support, best_support))
+          {
+            best_support = support;
+            best_model = sample_model;
+            report.success = true;
+          }
+        }
+        for(int k = 0; k < nSigmas; ++k)
+            minEps[k] = bisectionForEps(p_s[k],best_support.LRT, n);
+        for(int k = nSigmas-1; k >= 0; --k)
+            numIterations[k]=iterations(minEps[k]);
+        max_num_trials = std::min(numIterations[std::max(0,bestk-2)],
+            options_.max_num_trials);
       }
-
-      if (report.num_trials >= dyn_max_num_trials &&
-          report.num_trials >= options_.min_num_trials) {
-        abort = true;
-        break;
+      for(int k = nSigmas-1; k >= 0; --k)
+      {
+          size_t itNew = numIterations[k];
+          if(itNew < report.num_trials)
+          {
+              nSigmas--;
+              std::cout<<"nsigmas "<<nSigmas<<std::endl;
+          }
+          else
+              break;
       }
     }
+
+
   }
+
 
   report.support = best_support;
   report.model = best_model;
-
-  // No valid model was found.
-  if (report.support.num_inliers < estimator.kMinNumSamples) {
-    return report;
-  }
-
-  report.success = true;
+  report.vpm = report.vpm/models_tried;
 
   // Determine inlier mask. Note that this calculates the residuals for the
   // best model twice, but saves to copy and fill the inlier mask for each

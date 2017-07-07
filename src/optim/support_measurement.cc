@@ -67,7 +67,10 @@ bool MEstimatorSupportMeasurer::Compare(const Support& support1,
   return support1.score < support2.score;
 }
 
-LRTSupportMeasurer::Support LRTSupportMeasurer::Evaluate(const double p_s, const double eps, const double sigma, const size_t n)
+LRTSupportMeasurer::Support LRTSupportMeasurer::Evaluate(const double p_s,
+                                                         const double eps,
+                                                         const double sigma,
+                                                         const size_t n)
 {
     Support support;
     support.sigma = sigma;
@@ -78,7 +81,8 @@ LRTSupportMeasurer::Support LRTSupportMeasurer::Evaluate(const double p_s, const
     return support;
 }
 
-bool LRTSupportMeasurer::Compare(const Support &support1, const Support &support2)
+bool LRTSupportMeasurer::Compare(const Support &support1,
+                                 const Support &support2)
 {
     if (support1.LRT > support2.LRT) {
       return true;

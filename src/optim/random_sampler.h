@@ -34,8 +34,6 @@ class RandomSampler : public Sampler {
 
   std::vector<size_t> Sample() override;
 
-  std::vector<size_t> Sample(const size_t num_samples);
-
  private:
   const size_t num_samples_;
   std::vector<size_t> sample_idxs_;

@@ -46,15 +46,5 @@ std::vector<size_t> RandomSampler::Sample() {
   return sampled_idxs;
 }
 
-std::vector<size_t> RandomSampler::Sample(size_t num_samples) {
-  Shuffle(static_cast<uint32_t>(num_samples), &sample_idxs_);
-
-  std::vector<size_t> sampled_idxs(num_samples);
-  for (size_t i = 0; i < num_samples; ++i) {
-    sampled_idxs[i] = sample_idxs_[i];
-  }
-
-  return sampled_idxs;
-}
 
 }  // namespace colmap
