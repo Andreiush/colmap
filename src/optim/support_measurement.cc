@@ -75,6 +75,7 @@ LRTSupportMeasurer::Support LRTSupportMeasurer::Evaluate(const double p_s,
     Support support;
     support.sigma = sigma;
     support.inRatio = eps;
+    support.num_inliers = eps*n;
     double a = eps*std::log(eps/p_s);
     double b = (1-eps)*(std::log(1-eps)/(1-p_s));
     support.LRT = 2*n*(a+b);

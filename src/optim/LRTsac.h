@@ -41,7 +41,7 @@ struct LRToptions {
   size_t max_num_trials = std::numeric_limits<size_t>::max();
 
   //bucket size for bailout
-  size_t B;
+  size_t B = 20;
 
   //range for sigma search
   double sigma_min;
@@ -55,7 +55,7 @@ struct LRToptions {
     CHECK_GE(min_inlier_ratio, 0);
     CHECK_LE(min_inlier_ratio, 1);
     CHECK_GE(dim, 1);
-    CHECK_LE(dim, 2);
+    CHECK_LE(dim, 3);
     CHECK_GT(D, 0);
     CHECK_GT(A, 0);
     CHECK_GE(confidence, 0);
@@ -65,7 +65,7 @@ struct LRToptions {
   }
 };
 
-template <typename Estimator, typename SupportMeasurer = InlierSupportMeasurer,
+template <typename Estimator, typename SupportMeasurer = LRTSupportMeasurer,
           typename Sampler = RandomSampler>
 class LRTsac {
 public:
@@ -92,7 +92,7 @@ public:
   };
 
   explicit LRTsac(const LRToptions& options);
-
+  LRTsac(const LRToptions& options, bool extra);
   // Robustly estimate model with RANSAC (RANdom SAmple Consensus).
   //
   // @param X              Independent variables.
@@ -101,7 +101,9 @@ public:
   // @return               The report with the results of the estimation.
   Report Estimate(const std::vector<typename Estimator::X_t>& X,
                   const std::vector<typename Estimator::Y_t>& Y);
-
+  Report Estimate(const std::vector<typename Estimator::X_t>& X,
+                  const std::vector<typename Estimator::Y_t>& Y,
+                  const std::vector<double>& scales);
   // Objects used in RANSAC procedure. Access useful to define custom behavior
   // through options or e.g. to compute residuals.
   Estimator estimator;
@@ -113,7 +115,7 @@ protected:
 
   inline void makeSigmas(std::vector<double> &sigmas);
   inline double area(double sigma);
-  inline double LRT(double ps, double eps, double n);
+  inline double LRT(double ps, double eps, int n);
   double bisectionForEps(double sigma, double c, int n);
   size_t iterations(double eps);
   inline void makeTaos(std::vector<double> &taos, int n);
@@ -138,22 +140,39 @@ LRTsac<Estimator, SupportMeasurer, Sampler>::LRTsac(
 }
 
 template <typename Estimator, typename SupportMeasurer, typename Sampler>
+LRTsac<Estimator, SupportMeasurer, Sampler>::LRTsac(
+    const LRToptions& options, bool extra)
+  : sampler(Sampler(Estimator::kMinNumSamples+1)), options_(options) {
+  options.Check();
+}
+
+
+template <typename Estimator, typename SupportMeasurer, typename Sampler>
 inline void LRTsac<Estimator, SupportMeasurer, Sampler>::makeSigmas(
     std::vector<double> &sigmas)
 {
   int nSigma = (options_.sigma_max-options_.sigma_min)/options_.delta_sigma;
   sigmas.resize(nSigma);
   for(int i = 0; i < nSigma; ++i)
-    sigmas[i] = sigma_min+options_.delta_sigma*i;
+    sigmas[i] = options_.sigma_min + options_.delta_sigma*i;
 }
 
 template <typename Estimator, typename SupportMeasurer, typename Sampler>
 inline double LRTsac<Estimator, SupportMeasurer, Sampler>::area(double sigma)
 {
-  if(dim == 1)
-    return 2*sigma*options_.D/options_.A;
-  else
-    return M_PI*(sigma*sigma)/(options_.D);
+  switch (options_.dim) {
+    case 1:
+      return 2*sigma*options_.D/options_.A;
+      break;
+    case 2:
+      return M_PI*(sigma*sigma)/(options_.A);
+      break;
+    case 3:
+      return 4*M_PI*(sigma*sigma*sigma)/std::pow(options_.D, 3);
+      break;
+    default:
+      return 0;
+  }
 }
 
 template <typename Estimator, typename SupportMeasurer, typename Sampler>
@@ -211,7 +230,7 @@ inline void LRTsac<Estimator, SupportMeasurer, Sampler>::makeTaos(
   for(int i = 0; i < Q; ++i)
   {
     double a = std::log((double)Q)-std::log(options_.beta);
-    double m = (i+1)*B;
+    double m = (i+1) * options_.B;
     taos[i] = std::sqrt(a/(2*m));
   }
 }
@@ -228,14 +247,25 @@ inline void LRTsac<Estimator, SupportMeasurer, Sampler>::computeEps(
     eps[i]/=n;
 }
 
+template <typename Estimator, typename SupportMeasurer, typename Sampler>
+typename LRTsac<Estimator, SupportMeasurer, Sampler>::Report
+LRTsac<Estimator, SupportMeasurer, Sampler>::Estimate(
+    const std::vector<typename Estimator::X_t>& X,
+    const std::vector<typename Estimator::Y_t>& Y)
+{
+  std::vector<double> scales(X.size(),1.0);
+  return Estimate(X, Y, scales);
+}
+
 
 template <typename Estimator, typename SupportMeasurer, typename Sampler>
 typename LRTsac<Estimator, SupportMeasurer, Sampler>::Report
 LRTsac<Estimator, SupportMeasurer, Sampler>::Estimate(
     const std::vector<typename Estimator::X_t>& X,
-    const std::vector<typename Estimator::Y_t>& Y) {
+    const std::vector<typename Estimator::Y_t>& Y,
+    const std::vector<double> &scales) {
   CHECK_EQ(X.size(), Y.size());
-
+  CHECK_EQ(X.size(), scales.size());
   const size_t num_samples = X.size();
 
   Report report;
@@ -254,9 +284,11 @@ LRTsac<Estimator, SupportMeasurer, Sampler>::Estimate(
   size_t nSigmas = sigmas.size();
   const size_t n = X.size();
 
+  double maxScale = *std::max_element(scales.begin(), scales.end());
+
   std::vector<double> p_s(nSigmas);
   for(int i = 0; i < nSigmas; ++i)
-    p_s[i] = area(sigmas[i]);
+    p_s[i] = area(maxScale*sigmas[i]);
 
   std::vector<double> minEps(nSigmas);
   for(int i = 0; i < nSigmas; ++i)
@@ -276,7 +308,7 @@ LRTsac<Estimator, SupportMeasurer, Sampler>::Estimate(
 
   std::vector<int> random_indices(num_samples);
   std::iota(random_indices.begin(), random_indices.end(), 0);
-  Shuffle(num_samples, random_indices);
+  Shuffle(static_cast<uint32_t>(num_samples), &random_indices);
 
   sampler.Initialize(num_samples);
 
@@ -294,9 +326,9 @@ LRTsac<Estimator, SupportMeasurer, Sampler>::Estimate(
     const std::vector<typename Estimator::M_t> sample_models =
         estimator.Estimate(X_rand, Y_rand);
 
-    std::vector<long> numIterations(nSigmas);
+    std::vector<size_t> numIterations(nSigmas);
     for(int k = nSigmas-1; k >= 0; --k)
-        numIterations[k]=iterations(minEps[k]);
+      numIterations[k]=iterations(minEps[k]);
 
     // Iterate through all estimated models.
     for (const auto& sample_model : sample_models)
@@ -312,8 +344,9 @@ LRTsac<Estimator, SupportMeasurer, Sampler>::Estimate(
         Y_test[0] = Y[random_indices[j]];
         estimator.Residuals(X_test, Y_test, sample_model, &residuals);
         CHECK_EQ(residuals.size(), X_test.size());
-        double err = std::sqrt(residuals[0]);
-        int ind =  std::max(ceil((err-sigma_min)/delta_sigma), 0.0);
+        double err = std::sqrt(residuals[0])/scales[random_indices[j]];
+        int ind =  std::max(ceil((err-options_.sigma_min)/options_. delta_sigma),
+                            0.0);
         report.vpm ++;
         if(ind < nSigmas && ind >= 0)
           ks[ind] += 1;
@@ -336,11 +369,11 @@ LRTsac<Estimator, SupportMeasurer, Sampler>::Estimate(
       //check if we didn't bailout, then we found a good model
       if(!bailout)
       {
-        int bestk = 0;
+        int bestk = -1;
         for(size_t k = 0; k < curEps.size(); ++k)
         {
           const auto support = support_measurer.Evaluate(p_s[k], curEps[k],
-                                                         sigma[k], n);
+                                                         sigmas[k], n);
 
           // Save as best subset if better than all previous subsets.
           if (support_measurer.Compare(support, best_support))
@@ -348,29 +381,31 @@ LRTsac<Estimator, SupportMeasurer, Sampler>::Estimate(
             best_support = support;
             best_model = sample_model;
             report.success = true;
+            bestk = k;
           }
         }
-        for(int k = 0; k < nSigmas; ++k)
+        if(bestk >= 0)
+        {
+          for(int k = 0; k < nSigmas; ++k)
             minEps[k] = bisectionForEps(p_s[k],best_support.LRT, n);
-        for(int k = nSigmas-1; k >= 0; --k)
+          for(int k = nSigmas-1; k >= 0; --k)
             numIterations[k]=iterations(minEps[k]);
-        max_num_trials = std::min(numIterations[std::max(0,bestk-2)],
-            options_.max_num_trials);
+          max_num_trials = std::min(numIterations[std::max(0,bestk-2)],
+              options_.max_num_trials);
+        }
       }
       for(int k = nSigmas-1; k >= 0; --k)
       {
-          size_t itNew = numIterations[k];
-          if(itNew < report.num_trials)
-          {
-              nSigmas--;
-              std::cout<<"nsigmas "<<nSigmas<<std::endl;
-          }
-          else
-              break;
+        size_t itNew = numIterations[k];
+        if(itNew < report.num_trials)
+        {
+          nSigmas--;
+         // std::cout<<"nsigmas "<<nSigmas<<std::endl;
+        }
+        else
+          break;
       }
     }
-
-
   }
 
 
@@ -384,10 +419,11 @@ LRTsac<Estimator, SupportMeasurer, Sampler>::Estimate(
 
   estimator.Residuals(X, Y, report.model, &residuals);
   CHECK_EQ(residuals.size(), X.size());
-
+  double max_residual = std::pow(report.support.sigma, 2);
   report.inlier_mask.resize(num_samples);
   for (size_t i = 0; i < residuals.size(); ++i) {
-    if (residuals[i] <= max_residual) {
+    double s = scales[i]*scales[i];
+    if (residuals[i] <= max_residual/s) {
       report.inlier_mask[i] = true;
     } else {
       report.inlier_mask[i] = false;

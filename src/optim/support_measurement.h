@@ -62,14 +62,17 @@ struct MEstimatorSupportMeasurer {
   bool Compare(const Support& support1, const Support& support2);
 };
 
-// Measure the support of a model by computing its LRT given its inlier ratio and sigma (noise level). A support is better than another when its LRT is bigger (and smaller sigma if they are the same)
+// Measure the support of a model by computing its LRT given its inlier ratio
+// and sigma (noise level). A support is better than another when its LRT
+// is bigger (and smaller sigma if they are the same)
 struct LRTSupportMeasurer {
   struct Support {
     // The number of inliers.
+    size_t num_inliers = 0;
     double inRatio = 0;
     double sigma = 0;
     // The sum of all inlier residuals.
-    double LRT = std::numeric_limits<double>::min();
+    double LRT = 0;
   };
 
   // Compute the LRT score
@@ -77,7 +80,7 @@ struct LRTSupportMeasurer {
                    const size_t n);
 
   // Compare the two supports and return the better support.
-  bool Compare(const Support& support1, const Support& support2);
+  static bool Compare(const Support& support1, const Support& support2);
 };
 
 }  // namespace colmap
