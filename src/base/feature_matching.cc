@@ -917,7 +917,8 @@ void SiftFeatureMatcher::Match(
         cache_->ExistsMatches(image_pair.first, image_pair.second);
     const bool exists_inlier_matches =
         cache_->ExistsInlierMatches(image_pair.first, image_pair.second);
-  //  exists_inlier_matches = false;//I'm forcing it to always redo the geometric verification when we do the matching!
+  // exists_inlier_matches = false;//I'm forcing it to always redo the
+  // geometric verification when we do the matching!
     if (exists_matches && exists_inlier_matches) {
       //continue;
         std::cout<<"they exist!"<<std::endl;

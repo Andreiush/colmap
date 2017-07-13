@@ -349,6 +349,7 @@ bool IncrementalMapper::RegisterNextImage(const Options& options,
   std::vector<std::pair<point2D_t, point3D_t>> tri_corrs;
   std::vector<Eigen::Vector2d> tri_points2D;
   std::vector<Eigen::Vector3d> tri_points3D;
+  std::vector<double> scales;
 
   for (point2D_t point2D_idx = 0; point2D_idx < image.NumPoints2D();
        ++point2D_idx) {
@@ -357,7 +358,8 @@ bool IncrementalMapper::RegisterNextImage(const Options& options,
     const std::vector<SceneGraph::Correspondence> corrs =
         scene_graph.FindTransitiveCorrespondences(image_id, point2D_idx,
                                                   kCorrTransitivity);
-
+    const double scale = database_cache_->scales_.at(image_id).at(point2D_idx);
+    //double scale = database_cache_
     std::unordered_set<point3D_t> point3D_ids;
 
     for (const auto corr : corrs) {
@@ -393,6 +395,7 @@ bool IncrementalMapper::RegisterNextImage(const Options& options,
       point3D_ids.insert(corr_point2D.Point3DId());
       tri_points2D.push_back(point2D.XY());
       tri_points3D.push_back(point3D.XYZ());
+      scales.push_back(scale);
     }
   }
 
@@ -462,7 +465,7 @@ bool IncrementalMapper::RegisterNextImage(const Options& options,
   size_t num_inliers;
   std::vector<char> inlier_mask;
 
-  if (!EstimateAbsolutePose(abs_pose_options, tri_points2D, tri_points3D,
+  if (!EstimateAbsolutePose(abs_pose_options, tri_points2D, tri_points3D, scales,
                             &image.Qvec(), &image.Tvec(), &camera, &num_inliers,
                             &inlier_mask)) {
     return false;

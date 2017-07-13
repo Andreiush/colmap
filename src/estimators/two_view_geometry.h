@@ -20,6 +20,7 @@
 #include "base/camera.h"
 #include "base/feature.h"
 #include "optim/ransac.h"
+#include "optim/LRTsac.h"
 #include "util/alignment.h"
 #include "util/logging.h"
 
@@ -91,7 +92,7 @@ struct TwoViewGeometry {
 
     // Options used to robustly estimate the geometry.
     RANSACOptions ransac_options;
-
+    //LRToptions lrt_options;
     void Check() const {
       CHECK_GE(min_num_inliers, 0);
       CHECK_GE(min_E_F_inlier_ratio, 0);
@@ -103,6 +104,7 @@ struct TwoViewGeometry {
       CHECK_GE(watermark_border_size, 0);
       CHECK_LE(watermark_border_size, 1);
       ransac_options.Check();
+      //lrt_options.Check();
     }
   };
 

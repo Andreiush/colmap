@@ -29,6 +29,15 @@ std::vector<Eigen::Vector2d> FeatureKeypointsToPointsVector(
   return points;
 }
 
+std::vector<double> FeatureKeypointsToScaleVector(
+    const FeatureKeypoints& keypoints) {
+  std::vector<double> scales(keypoints.size());
+  for (size_t i = 0; i < keypoints.size(); ++i) {
+    scales[i] = keypoints[i].scale;
+  }
+  return scales;
+}
+
 Eigen::MatrixXf L2NormalizeFeatureDescriptors(
     const Eigen::MatrixXf& descriptors) {
   return descriptors.rowwise().normalized();

@@ -54,6 +54,10 @@ typedef std::vector<FeatureMatch> FeatureMatches;
 std::vector<Eigen::Vector2d> FeatureKeypointsToPointsVector(
     const FeatureKeypoints& keypoints);
 
+// Convert feature keypoints to vector of scales
+std::vector<double> FeatureKeypointsToScaleVector(
+    const FeatureKeypoints& keypoints);
+
 // L2-normalize feature descriptor, where each row represents one feature.
 Eigen::MatrixXf L2NormalizeFeatureDescriptors(
     const Eigen::MatrixXf& descriptors);

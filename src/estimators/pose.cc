@@ -24,18 +24,21 @@
 #include "estimators/essential_matrix.h"
 #include "estimators/p3p.h"
 #include "optim/bundle_adjustment.h"
+#include "optim/LO_LRTsac.h"
 #include "util/misc.h"
 #include "util/threading.h"
 
 namespace colmap {
 namespace {
 
-typedef LORANSAC<P3PEstimator, EPnPEstimator> AbsolutePoseRANSAC_t;
+typedef LRTsac<P3PEstimator> AbsolutePoseRANSAC_t;
+//typedef LO_LRTsac<P3PEstimator, EPnPEstimator> AbsolutePoseRANSAC_t;
 
 void EstimateAbsolutePoseKernel(const Camera& camera,
                                 const double focal_length_factor,
                                 const std::vector<Eigen::Vector2d>& points2D,
                                 const std::vector<Eigen::Vector3d>& points3D,
+                                const std::vector<double> &scales,
                                 const RANSACOptions& options,
                                 AbsolutePoseRANSAC_t::Report* report) {
   // Scale the focal length by the given factor.
@@ -52,10 +55,28 @@ void EstimateAbsolutePoseKernel(const Camera& camera,
   }
 
   // Estimate pose for given focal length.
-  auto custom_options = options;
-  custom_options.max_error =
+  //auto custom_options = options;
+  double max_error =
       scaled_camera.ImageToWorldThreshold(options.max_error);
-  AbsolutePoseRANSAC_t ransac(custom_options);
+
+  LRToptions lrt_options;
+  lrt_options.min_inlier_ratio = options.min_inlier_ratio;
+  lrt_options.max_num_trials = options.max_num_trials;
+  lrt_options.min_num_trials = options.min_num_trials;
+
+  lrt_options.dim = 2;
+  lrt_options.D = std::sqrt(std::pow(camera.Height(), 2)+
+                           std::pow(camera.Width(), 2));
+  lrt_options.A = camera.Width() * camera.Height();
+
+  lrt_options.sigma_min = max_error/10;
+  lrt_options.sigma_max = max_error*10;
+  lrt_options.delta_sigma = (lrt_options.sigma_max - lrt_options.sigma_min)/50;
+  lrt_options.Check();
+
+
+
+  AbsolutePoseRANSAC_t ransac(lrt_options);
   *report = ransac.Estimate(points2D_N, points3D);
 }
 
@@ -64,6 +85,7 @@ void EstimateAbsolutePoseKernel(const Camera& camera,
 bool EstimateAbsolutePose(const AbsolutePoseEstimationOptions& options,
                           const std::vector<Eigen::Vector2d>& points2D,
                           const std::vector<Eigen::Vector3d>& points3D,
+                          const std::vector<double> &scales,
                           Eigen::Vector4d* qvec, Eigen::Vector3d* tvec,
                           Camera* camera, size_t* num_inliers,
                           std::vector<char>* inlier_mask) {
@@ -95,11 +117,11 @@ bool EstimateAbsolutePose(const AbsolutePoseEstimationOptions& options,
 
   ThreadPool thread_pool(std::min(
       options.num_threads, static_cast<int>(focal_length_factors.size())));
-
+  std::cout<<"Estimating absolute pose!!!!!!!!!!!!!!!!!!!!!!!!!!! "<<std::endl;
   for (size_t i = 0; i < focal_length_factors.size(); ++i) {
     futures[i] = thread_pool.AddTask(
         EstimateAbsolutePoseKernel, *camera, focal_length_factors[i], points2D,
-        points3D, options.ransac_options, &reports[i]);
+        points3D, scales, options.ransac_options, &reports[i]);
   }
 
   double focal_length_factor = 0;
@@ -122,6 +144,7 @@ bool EstimateAbsolutePose(const AbsolutePoseEstimationOptions& options,
   if (*num_inliers == 0) {
     return false;
   }
+  std::cout<<"!!!!!!!!!!!Number of inliers: "<<*num_inliers<<std::endl;
 
   // Scale output camera with best estimated focal length.
   if (options.estimate_focal_length && *num_inliers > 0) {

@@ -77,11 +77,12 @@ class DatabaseCache {
             const bool ignore_watermarks,
             const std::set<std::string>& image_names);
 
+  EIGEN_STL_UMAP(image_t, std::vector<double>) scales_;
  private:
   class SceneGraph scene_graph_;
 
   EIGEN_STL_UMAP(camera_t, class Camera) cameras_;
-  EIGEN_STL_UMAP(image_t, class Image) images_;
+  EIGEN_STL_UMAP(image_t, class Image) images_;//make public a similar map(image_t, vector<double>)
 };
 
 ////////////////////////////////////////////////////////////////////////////////

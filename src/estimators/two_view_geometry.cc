@@ -28,6 +28,7 @@
 #include "estimators/translation_transform.h"
 #include "optim/loransac.h"
 #include "optim/ransac.h"
+#include "optim/LO_LRTsac.h"
 #include "util/random.h"
 
 namespace colmap {
@@ -339,17 +340,42 @@ void TwoViewGeometry::EstimateUncalibrated(
 
   // Estimate epipolar model.
 
-  LORANSAC<FundamentalMatrixSevenPointEstimator,
-           FundamentalMatrixEightPointEstimator>
-      F_ransac(options.ransac_options);
+ // LORANSAC<FundamentalMatrixSevenPointEstimator,
+  //         FundamentalMatrixEightPointEstimator>
+  //    F_ransac(options.ransac_options);
+  LRToptions lrt_options;
+  lrt_options.min_inlier_ratio = options.ransac_options.min_inlier_ratio;
+  lrt_options.max_num_trials = options.ransac_options.max_num_trials;
+  lrt_options.min_num_trials = options.ransac_options.min_num_trials;
+  lrt_options.dim = 1;
+  double diam1 = std::sqrt(std::pow(camera1.Height(), 2)+
+                           std::pow(camera1.Width(), 2));
+
+  double diam2 = std::sqrt(std::pow(camera2.Height(), 2)+
+                           std::pow(camera2.Width(), 2));
+  double area1 = camera1.Width() * camera1.Height();
+  double area2 = camera2.Width() * camera2.Height();
+  lrt_options.D = (diam1 + diam2)/2;
+  lrt_options.A = (area1 + area2)/2;
+  lrt_options.sigma_min = options.ransac_options.max_error/10;
+  lrt_options.sigma_max = options.ransac_options.max_error*10;
+  lrt_options.delta_sigma = (lrt_options.sigma_max - lrt_options.sigma_min)/50;
+  lrt_options.Check();
+
+  LO_LRTsac<FundamentalMatrixSevenPointEstimator, FundamentalMatrixEightPointEstimator>
+      F_ransac(lrt_options);
   const auto F_report = F_ransac.Estimate(matched_points1, matched_points2);
   F = F_report.model;
   F_num_inliers = F_report.support.num_inliers;
 
   // Estimate planar or panoramic model.
 
-  LORANSAC<HomographyMatrixEstimator, HomographyMatrixEstimator> H_ransac(
-      options.ransac_options);
+//  LORANSAC<HomographyMatrixEstimator, HomographyMatrixEstimator> H_ransac(
+  //    options.ransac_options);
+  lrt_options.dim = 2;
+  LO_LRTsac<HomographyMatrixEstimator, HomographyMatrixEstimator> H_ransac(
+      lrt_options);
+
   const auto H_report = H_ransac.Estimate(matched_points1, matched_points2);
   H = H_report.model;
   H_num_inliers = H_report.support.num_inliers;

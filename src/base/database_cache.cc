@@ -134,7 +134,12 @@ void DatabaseCache::Load(const Database& database, const size_t min_num_matches,
             database.ReadKeypoints(image.ImageId());
         const std::vector<Eigen::Vector2d> points =
             FeatureKeypointsToPointsVector(keypoints);
+        // Save the scales of the feature
+        const std::vector<double> scales =
+            FeatureKeypointsToScaleVector(keypoints);
         images_[image.ImageId()].SetPoints2D(points);
+        // Save scales in a map of <image_t, vector<double>>
+        scales_.emplace(image.ImageId(), scales);
       }
     }
 
