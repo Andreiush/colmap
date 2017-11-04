@@ -312,6 +312,7 @@ D_LRTsac<Estimator, LocalEstimator, Sampler>::Estimate(
               local_estimator.Residuals(X, Y, local_model, &residuals1,
                                         &residuals2);
               CHECK_EQ(residuals1.size(), X.size());
+              CHECK_EQ(residuals1.size(), residuals2.size());
 
               //evaluate the model with all points
               ks = Eigen::MatrixXi::Zero(nSigmas1, nSigmas2);
@@ -376,6 +377,7 @@ D_LRTsac<Estimator, LocalEstimator, Sampler>::Estimate(
   }
 
   CHECK_EQ(residuals1.size(), X.size());
+  CHECK_EQ(residuals1.size(), residuals2.size());
 
   double max_residual1 = report.support.sigma1;
   double max_residual2 = report.support.sigma2;

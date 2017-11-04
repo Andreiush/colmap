@@ -123,7 +123,7 @@ void HomographyMatrixEstimator::Residuals(const std::vector<X_t>& points1,
   CHECK_EQ(points1.size(), points2.size());
 
   residuals1->resize(points1.size());
-  residuals1->resize(points1.size());
+  residuals2->resize(points1.size());
 
   // Note that this code might not be as nice as Eigen expressions,
   // but it is significantly faster in various tests.

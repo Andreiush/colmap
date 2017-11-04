@@ -243,6 +243,8 @@ inline void LRTsac<Estimator, SupportMeasurer, Sampler>::computeEps(
     std::vector <double> &eps, std::vector<int> const &ks, int n)
 {
   eps.resize(ks.size());
+  if(eps.empty())
+    return;
   eps[0] = ks[0];
   for(int i = 1; i < ks.size(); ++i)
     eps[i] = eps[i-1]+ks[i];
