@@ -69,9 +69,11 @@ struct LRTSupportMeasurer {
   struct Support {
     // The number of inliers.
     size_t num_inliers = 0;
+    // The inlier ratio
     double inRatio = 0;
+    // The inlier threshold estimate
     double sigma = 0;
-    // The sum of all inlier residuals.
+    // LRT value.
     double LRT = 0;
   };
 
@@ -82,6 +84,31 @@ struct LRTSupportMeasurer {
   // Compare the two supports and return the better support.
   static bool Compare(const Support& support1, const Support& support2);
 };
+
+// Measure the support of a model by computing its LRT given its inlier ratio
+// and two sigmas (noise level). A support is better than another when its LRT
+// is bigger
+struct DLRTSupportMeasurer {
+  struct Support {
+    // The number of inliers.
+    size_t num_inliers = 0;
+    // The inlier ratio
+    double inRatio = 0;
+    // The inlier threshold estimate for images 1 and 2
+    double sigma1 = 0;
+    double sigma2 = 0;
+    // LRT value.
+    double LRT = 0;
+  };
+
+  // Compute the LRT score
+  Support Evaluate(const double p_s, const double inRatio, const double sigma1,
+                   const double sigma2, const size_t n);
+
+  // Compare the two supports and return the better support.
+  static bool Compare(const Support& support1, const Support& support2);
+};
+
 
 }  // namespace colmap
 

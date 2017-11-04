@@ -31,7 +31,8 @@ struct LRToptions {
   unsigned int dim = 1;
   double D;
   double A;
-
+  double D2;
+  double A2;
   // Abort the iteration if minimum probability that one sample is free from
   // outliers is reached.
   double confidence = 0.99;
@@ -58,6 +59,8 @@ struct LRToptions {
     CHECK_LE(dim, 3);
     CHECK_GT(D, 0);
     CHECK_GT(A, 0);
+    CHECK_GE(D2, 0);
+    CHECK_GE(A2, 0);
     CHECK_GE(confidence, 0);
     CHECK_LE(confidence, 1);
     CHECK_LE(min_num_trials, max_num_trials);

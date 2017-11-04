@@ -68,6 +68,22 @@ class FundamentalMatrixSevenPointEstimator {
   static void Residuals(const std::vector<X_t>& points1,
                         const std::vector<Y_t>& points2, const M_t& F,
                         std::vector<double>* residuals);
+
+
+  // Overloaded function to compute the residuals of corresponding points and
+  // a given fundamental matrix, now defined as the two point to epipolar line
+  // errors.
+  //
+  // @param points1    First set of corresponding points.
+  // @param points2    Second set of corresponding points.
+  // @param E          3x3 essential matrix.
+  // @param residuals1  Output vector of residuals for image 1.
+  // @param residuals2  Output vector of residuals for image 2.
+
+  static void Residuals(const std::vector<X_t>& points1,
+                        const std::vector<Y_t>& points2, const M_t& F,
+                        std::vector<double>* residuals1,
+                        std::vector<double>* residuals2);
 };
 
 // Fundamental matrix estimator from corresponding point pairs.
@@ -107,6 +123,22 @@ class FundamentalMatrixEightPointEstimator {
   static void Residuals(const std::vector<X_t>& points1,
                         const std::vector<Y_t>& points2, const M_t& F,
                         std::vector<double>* residuals);
+
+  // Calculate the residuals of a set of corresponding points and a given
+  // fundamental matrix.
+  //
+  // Residuals are defined as two point to epipolar line errors.
+  //
+  // @param points1    First set of corresponding points as Nx2 matrix.
+  // @param points2    Second set of corresponding points as Nx2 matrix.
+  // @param F          3x3 fundamental matrix.
+  // @param residuals1  Output vector of residuals for image 1.
+  // @param residuals2  Output vector of residuals for image 2.
+
+  static void Residuals(const std::vector<X_t>& points1,
+                        const std::vector<Y_t>& points2, const M_t& F,
+                        std::vector<double>* residuals1,
+                        std::vector<double>* residuals2);
 };
 
 }  // namespace colmap

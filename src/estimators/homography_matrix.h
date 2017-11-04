@@ -61,6 +61,22 @@ class HomographyMatrixEstimator {
   static void Residuals(const std::vector<X_t>& points1,
                         const std::vector<Y_t>& points2, const M_t& H,
                         std::vector<double>* residuals);
+
+  // Calculate the transformation error for each corresponding point pair.
+  //
+  // Residuals are defined as both the transformation errors when
+  // transforming the source to the destination coordinates and viceversa.
+  //
+  // @param points1    First set of corresponding points.
+  // @param points2    Second set of corresponding points.
+  // @param H          3x3 projective matrix.
+  // @param residuals1  Output vector of residuals for image 1.
+  // @param residuals1  Output vector of residuals for image 1.
+
+  static void Residuals(const std::vector<X_t>& points1,
+                        const std::vector<Y_t>& points2, const M_t& H,
+                        std::vector<double>* residuals1,
+                        std::vector<double>* residuals2);
 };
 
 }  // namespace colmap

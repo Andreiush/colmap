@@ -93,4 +93,27 @@ bool LRTSupportMeasurer::Compare(const Support &support1,
     }
 }
 
+DLRTSupportMeasurer::Support DLRTSupportMeasurer::Evaluate(const double p_s,
+                                                         const double eps,
+                                                         const double sigma1,
+                                                         const double sigma2,
+                                                         const size_t n)
+{
+    Support support;
+    support.sigma1 = sigma1;
+    support.sigma2 = sigma2;
+    support.inRatio = eps;
+    support.num_inliers = eps*n;
+    double a = eps*std::log(eps/p_s);
+    double b = (1-eps)*(std::log(1-eps)/(1-p_s));
+    support.LRT = 2*n*(a+b);
+    return support;
+}
+
+bool DLRTSupportMeasurer::Compare(const Support &support1,
+                                 const Support &support2)
+{
+  return support1.LRT > support2.LRT;
+}
+
 }  // namespace colmap

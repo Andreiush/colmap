@@ -69,6 +69,58 @@ void CenterAndNormalizeImagePoints(const std::vector<Eigen::Vector2d>& points,
   }
 }
 
+void ComputePointToLineError(const std::vector<Eigen::Vector2d>& points1,
+                             const std::vector<Eigen::Vector2d>& points2,
+                             const Eigen::Matrix3d& E,
+                             std::vector<double>* residuals1,
+                             std::vector<double>* residuals2)
+{
+  CHECK_EQ(points1.size(), points2.size());
+
+  residuals1->resize(points1.size());
+  residuals2->resize(points1.size());
+
+  // Note that this code might not be as nice as Eigen expressions,
+  // but it is significantly faster in various tests
+
+  const double E_00 = E(0, 0);
+  const double E_01 = E(0, 1);
+  const double E_02 = E(0, 2);
+  const double E_10 = E(1, 0);
+  const double E_11 = E(1, 1);
+  const double E_12 = E(1, 2);
+  const double E_20 = E(2, 0);
+  const double E_21 = E(2, 1);
+  const double E_22 = E(2, 2);
+
+  for (size_t i = 0; i < points1.size(); ++i) {
+    const double x1_0 = points1[i](0);
+    const double x1_1 = points1[i](1);
+    const double x2_0 = points2[i](0);
+    const double x2_1 = points2[i](1);
+
+    // Ex1 = E * points1[i].homogeneous();
+    const double Ex1_0 = E_00 * x1_0 + E_01 * x1_1 + E_02;
+    const double Ex1_1 = E_10 * x1_0 + E_11 * x1_1 + E_12;
+    const double Ex1_2 = E_20 * x1_0 + E_21 * x1_1 + E_22;
+
+    // Etx2 = E.transpose() * points2[i].homogeneous();
+    const double Etx2_0 = E_00 * x2_0 + E_10 * x2_1 + E_20;
+    const double Etx2_1 = E_01 * x2_0 + E_11 * x2_1 + E_21;
+    const double Etx2_2 = E_02 * x2_0 + E_12 * x2_1 + E_22;
+
+    // x2tEx1 = points2[i].homogeneous().transpose() * Ex1;
+    const double x2tEx1 = x2_0 * Ex1_0 + x2_1 * Ex1_1 + Ex1_2;
+
+    // x1tEtx2 = points1[i].homogeneous().transpose() * Ex1;
+    const double x1tEtx2 = x1_0 * Etx2_0 + x1_1 * Etx2_1 + Etx2_2;
+
+    (*residuals1)[i] = std::abs(x1tEtx2 / std::sqrt(Etx2_0*Etx2_0 + Etx2_1*Etx2_1));
+    (*residuals2)[i] = std::abs(x2tEx1 / std::sqrt(Ex1_0 * Ex1_0 + Ex1_1 * Ex1_1));
+
+  }
+}
+
 void ComputeSquaredSampsonError(const std::vector<Eigen::Vector2d>& points1,
                                 const std::vector<Eigen::Vector2d>& points2,
                                 const Eigen::Matrix3d& E,

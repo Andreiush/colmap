@@ -115,4 +115,68 @@ void HomographyMatrixEstimator::Residuals(const std::vector<X_t>& points1,
   }
 }
 
+void HomographyMatrixEstimator::Residuals(const std::vector<X_t>& points1,
+                                          const std::vector<Y_t>& points2,
+                                          const M_t& H,
+                                          std::vector<double>* residuals1,
+                                          std::vector<double>* residuals2) {
+  CHECK_EQ(points1.size(), points2.size());
+
+  residuals1->resize(points1.size());
+  residuals1->resize(points1.size());
+
+  // Note that this code might not be as nice as Eigen expressions,
+  // but it is significantly faster in various tests.
+  M_t Hi = H.inverse();
+
+  const double H_00 = H(0, 0);
+  const double H_01 = H(0, 1);
+  const double H_02 = H(0, 2);
+  const double H_10 = H(1, 0);
+  const double H_11 = H(1, 1);
+  const double H_12 = H(1, 2);
+  const double H_20 = H(2, 0);
+  const double H_21 = H(2, 1);
+  const double H_22 = H(2, 2);
+
+  const double Hi_00 = Hi(0, 0);
+  const double Hi_01 = Hi(0, 1);
+  const double Hi_02 = Hi(0, 2);
+  const double Hi_10 = Hi(1, 0);
+  const double Hi_11 = Hi(1, 1);
+  const double Hi_12 = Hi(1, 2);
+  const double Hi_20 = Hi(2, 0);
+  const double Hi_21 = Hi(2, 1);
+  const double Hi_22 = Hi(2, 2);
+
+  for (size_t i = 0; i < points1.size(); ++i) {
+    const double s_0 = points1[i](0);
+    const double s_1 = points1[i](1);
+
+    const double d_0 = points2[i](0);
+    const double d_1 = points2[i](1);
+
+    const double pd_0 = H_00 * s_0 + H_01 * s_1 + H_02;
+    const double pd_1 = H_10 * s_0 + H_11 * s_1 + H_12;
+    const double pd_2 = H_20 * s_0 + H_21 * s_1 + H_22;
+
+    const double ps_0 = Hi_00 * d_0 + Hi_01 * d_1 + Hi_02;
+    const double ps_1 = Hi_10 * d_0 + Hi_11 * d_1 + Hi_12;
+    const double ps_2 = Hi_20 * d_0 + Hi_21 * d_1 + Hi_22;
+
+    const double inv_pd_2 = 1.0 / pd_2;
+    const double dd_0 = d_0 - pd_0 * inv_pd_2;
+    const double dd_1 = d_1 - pd_1 * inv_pd_2;
+
+    const double inv_ps_2 = 1.0 / ps_2;
+    const double ds_0 = s_0 - ps_0 * inv_ps_2;
+    const double ds_1 = s_1 - ps_1 * inv_ps_2;
+
+    (*residuals1)[i] = std::sqrt(dd_0 * dd_0 + dd_1 * dd_1);
+    (*residuals2)[i] = std::sqrt(ds_0 * ds_0 + ds_1 * ds_1);
+
+  }
+}
+
+
 }  // namespace colmap

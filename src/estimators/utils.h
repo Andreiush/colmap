@@ -59,6 +59,23 @@ void ComputeSquaredSampsonError(const std::vector<Eigen::Vector2d>& points1,
                                 const Eigen::Matrix3d& E,
                                 std::vector<double>* residuals);
 
+// Calculate the residuals of a set of corresponding points and a given
+// fundamental or essential matrix.
+//
+// Residuals are defined as the point to epipolar line error in each image.
+//
+// @param points1     First set of corresponding points as Nx2 matrix.
+// @param points2     Second set of corresponding points as Nx2 matrix.
+// @param E           3x3 fundamental or essential matrix.
+// @param residuals1   Output vector of residuals1.
+// @param residuals2   Output vector of residuals2.
+
+void ComputePointToLineError(const std::vector<Eigen::Vector2d>& points1,
+                                const std::vector<Eigen::Vector2d>& points2,
+                                const Eigen::Matrix3d& E,
+                                std::vector<double>* residuals1,
+                                std::vector<double>* residuals2);
+
 // Calculate the squared reprojection error given a set of 2D-3D point
 // correspondences and a projection matrix. Returns DBL_MAX if a 3D point is
 // behind the given camera.

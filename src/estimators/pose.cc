@@ -31,8 +31,8 @@
 namespace colmap {
 namespace {
 
-typedef LRTsac<P3PEstimator> AbsolutePoseRANSAC_t;
-//typedef LO_LRTsac<P3PEstimator, EPnPEstimator> AbsolutePoseRANSAC_t;
+//typedef LRTsac<P3PEstimator> AbsolutePoseRANSAC_t;
+typedef LO_LRTsac<P3PEstimator, EPnPEstimator> AbsolutePoseRANSAC_t;
 
 void EstimateAbsolutePoseKernel(const Camera& camera,
                                 const double focal_length_factor,

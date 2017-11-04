@@ -141,6 +141,13 @@ void EssentialMatrixFivePointEstimator::Residuals(
   ComputeSquaredSampsonError(points1, points2, E, residuals);
 }
 
+void EssentialMatrixFivePointEstimator::Residuals(
+    const std::vector<X_t>& points1, const std::vector<Y_t>& points2,
+    const M_t& E, std::vector<double>* residuals1,
+    std::vector<double>* residuals2) {
+  ComputePointToLineError(points1, points2, E, residuals1, residuals2);
+}
+
 std::vector<EssentialMatrixEightPointEstimator::M_t>
 EssentialMatrixEightPointEstimator::Estimate(const std::vector<X_t>& points1,
                                              const std::vector<Y_t>& points2) {
@@ -193,4 +200,10 @@ void EssentialMatrixEightPointEstimator::Residuals(
   ComputeSquaredSampsonError(points1, points2, E, residuals);
 }
 
+void EssentialMatrixEightPointEstimator::Residuals(
+    const std::vector<X_t>& points1, const std::vector<Y_t>& points2,
+    const M_t& E, std::vector<double>* residuals1,
+    std::vector<double>* residuals2) {
+  ComputePointToLineError(points1, points2, E, residuals1, residuals2);
+}
 }  // namespace colmap
