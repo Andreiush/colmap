@@ -222,23 +222,57 @@ void TwoViewGeometry::EstimateCalibrated(
        camera2.ImageToWorldThreshold(options.ransac_options.max_error)) /
       2;
 
-  LORANSAC<EssentialMatrixFivePointEstimator, EssentialMatrixFivePointEstimator>
-      E_ransac(E_ransac_options);
+  LRToptions lrt_options;
+  lrt_options.min_inlier_ratio = options.ransac_options.min_inlier_ratio;
+  lrt_options.max_num_trials = options.ransac_options.max_num_trials;
+  lrt_options.min_num_trials = options.ransac_options.min_num_trials;
+  lrt_options.dim = 1;
+
+  double norm_w1 = camera1.ImageToWorldThreshold(camera1.Width());
+  double norm_h1 = camera1.ImageToWorldThreshold(camera1.Height());
+  double norm_w2 = camera2.ImageToWorldThreshold(camera2.Width());
+  double norm_h2 = camera2.ImageToWorldThreshold(camera2.Height());
+
+  double diam1 = std::sqrt(std::pow(camera1.Height(), 2)+
+                           std::pow(camera1.Width(), 2));
+
+  double diam2 = std::sqrt(std::pow(camera2.Height(), 2)+
+                           std::pow(camera2.Width(), 2));
+  double area1 = camera1.Width() * camera1.Height();
+  double area2 = camera2.Width() * camera2.Height();
+  lrt_options.D = diam1;
+  lrt_options.A = area1;
+  lrt_options.A2 = area2;
+  lrt_options.D2 = diam2;
+  lrt_options.sigma_min = E_ransac_options.max_error/10;
+  lrt_options.sigma_max = E_ransac_options.max_error*10;
+  lrt_options.delta_sigma = (lrt_options.sigma_max - lrt_options.sigma_min)/50;
+  lrt_options.Check();
+
+  auto E_lrt_options = lrt_options;
+  E_lrt_options.D = std::sqrt(norm_h1*norm_h1 + norm_w1*norm_w1);
+  E_lrt_options.A = norm_w1 * norm_h1;
+  E_lrt_options.A2 = norm_w2 * norm_h2;
+  E_lrt_options.D2 =  std::sqrt(norm_h2*norm_h2 + norm_w2*norm_w2);
+
+
+  D_LRTsac<EssentialMatrixFivePointEstimator, EssentialMatrixFivePointEstimator>
+      E_ransac(E_lrt_options);
   const auto E_report = E_ransac.Estimate(matched_points1_N, matched_points2_N);
   E = E_report.model;
   E_num_inliers = E_report.support.num_inliers;
 
-  LORANSAC<FundamentalMatrixSevenPointEstimator,
+  D_LRTsac<FundamentalMatrixSevenPointEstimator,
            FundamentalMatrixEightPointEstimator>
-      F_ransac(options.ransac_options);
+      F_ransac(lrt_options);
   const auto F_report = F_ransac.Estimate(matched_points1, matched_points2);
   F = F_report.model;
   F_num_inliers = F_report.support.num_inliers;
 
   // Estimate planar or panoramic model.
 
-  LORANSAC<HomographyMatrixEstimator, HomographyMatrixEstimator> H_ransac(
-      options.ransac_options);
+  D_LRTsac<HomographyMatrixEstimator, HomographyMatrixEstimator> H_ransac(
+      lrt_options);
   const auto H_report = H_ransac.Estimate(matched_points1, matched_points2);
   H = H_report.model;
   H_num_inliers = H_report.support.num_inliers;
