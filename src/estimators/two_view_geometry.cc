@@ -193,7 +193,7 @@ void TwoViewGeometry::EstimateCalibrated(
     const FeatureMatches& matches, const Options& options) {
   options.Check();
 
-  std::cout<<"Estimating calibrated: "<<camera1.CameraId()<<" - "<<camera2.CameraId()<<std::endl;
+ // std::cout<<"Estimating calibrated: "<<camera1.CameraId()<<" - "<<camera2.CameraId()<<std::endl;
 
   if (matches.size() < options.min_num_inliers) {
     config = ConfigurationType::DEGENERATE;
@@ -361,7 +361,7 @@ void TwoViewGeometry::EstimateUncalibrated(
     const Camera& camera2, const std::vector<Eigen::Vector2d>& points2,
     const FeatureMatches& matches, const Options& options) {
   options.Check();
-  std::cout<<"Estimating uncalibrated: "<<camera1.CameraId()<<" - "<<camera2.CameraId()<<std::endl;
+  //std::cout<<"Estimating uncalibrated: "<<camera1.CameraId()<<" - "<<camera2.CameraId()<<std::endl;
   if (matches.size() < options.min_num_inliers) {
     config = ConfigurationType::DEGENERATE;
     return;
