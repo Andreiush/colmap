@@ -912,7 +912,7 @@ void SiftFeatureMatcher::Match(
     }
 
     image_pair_ids.insert(pair_id);
-    std::cout<<"Matching images: "<<image_pair.first<<" - "<<image_pair.second<<std::endl;
+
     const bool exists_matches =
         cache_->ExistsMatches(image_pair.first, image_pair.second);
     const bool exists_inlier_matches =
