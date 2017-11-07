@@ -244,9 +244,9 @@ void TwoViewGeometry::EstimateCalibrated(
   lrt_options.A = area1;
   lrt_options.A2 = area2;
   lrt_options.D2 = diam2;
-  lrt_options.sigma_min = E_ransac_options.max_error/10;
-  lrt_options.sigma_max = E_ransac_options.max_error*10;
-  lrt_options.delta_sigma = (lrt_options.sigma_max - lrt_options.sigma_min)/50;
+  lrt_options.sigma_min = options.ransac_options.max_error/2;
+  lrt_options.sigma_max = options.ransac_options.max_error*3;
+  lrt_options.delta_sigma = (lrt_options.sigma_max - lrt_options.sigma_min)/10;
   lrt_options.Check();
 
   auto E_lrt_options = lrt_options;
@@ -255,6 +255,9 @@ void TwoViewGeometry::EstimateCalibrated(
   E_lrt_options.A2 = norm_w2 * norm_h2;
   E_lrt_options.D2 =  std::sqrt(norm_h2*norm_h2 + norm_w2*norm_w2);
 
+  E_lrt_options.sigma_min = E_ransac_options.max_error/2;
+  E_lrt_options.sigma_max = E_ransac_options.max_error*3;
+  E_lrt_options.delta_sigma = (E_lrt_options.sigma_max - E_lrt_options.sigma_min)/10;
 
   D_LRTsac<EssentialMatrixFivePointEstimator, EssentialMatrixFivePointEstimator>
       E_ransac(E_lrt_options);
@@ -342,7 +345,20 @@ void TwoViewGeometry::EstimateCalibrated(
     config = ConfigurationType::DEGENERATE;
     return;
   }
+  double sigma1, sigma2;
+  if(config == ConfigurationType::PLANAR_OR_PANORAMIC)
+  {
+    sigma1 = H_report.support.sigma1;
+    sigma2 = H_report.support.sigma2;
+  }
+  else
+  {
+    sigma1 = F_report.support.sigma1;
+    sigma2 = F_report.support.sigma2;
+  }
 
+  std::cout<<" Estimated calibrated "<<camera1.CameraId()<<" - "<<camera2.CameraId()<<std::endl;
+  std::cout<<"Sigma1: "<<sigma1<<" - Sigma2: "<<sigma2<<std::endl;
   if (best_inlier_mask != nullptr) {
     inlier_matches =
         ExtractInlierMatches(matches, num_inliers, *best_inlier_mask);
@@ -396,9 +412,9 @@ void TwoViewGeometry::EstimateUncalibrated(
   lrt_options.A = area1;
   lrt_options.A2 = area2;
   lrt_options.D2 = diam2;
-  lrt_options.sigma_min = options.ransac_options.max_error/10;
-  lrt_options.sigma_max = options.ransac_options.max_error*10;
-  lrt_options.delta_sigma = (lrt_options.sigma_max - lrt_options.sigma_min)/50;
+  lrt_options.sigma_min = options.ransac_options.max_error/2;
+  lrt_options.sigma_max = options.ransac_options.max_error*3;
+  lrt_options.delta_sigma = (lrt_options.sigma_max - lrt_options.sigma_min)/10;
   lrt_options.Check();
 
   D_LRTsac<FundamentalMatrixSevenPointEstimator, FundamentalMatrixEightPointEstimator>
@@ -436,6 +452,21 @@ void TwoViewGeometry::EstimateUncalibrated(
   } else {
     config = ConfigurationType::UNCALIBRATED;
   }
+
+  double sigma1, sigma2;
+  if(config == ConfigurationType::PLANAR_OR_PANORAMIC)
+  {
+    sigma1 = H_report.support.sigma1;
+    sigma2 = H_report.support.sigma2;
+  }
+  else
+  {
+    sigma1 = F_report.support.sigma1;
+    sigma2 = F_report.support.sigma2;
+  }
+
+  std::cout<<" Estimated calibrated "<<camera1.CameraId()<<" - "<<camera2.CameraId()<<std::endl;
+  std::cout<<"Sigma1: "<<sigma1<<" - Sigma2: "<<sigma2<<std::endl;
 
   inlier_matches =
       ExtractInlierMatches(matches, F_num_inliers, F_report.inlier_mask);
