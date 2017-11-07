@@ -325,8 +325,14 @@ LRTsac<Estimator, SupportMeasurer, Sampler>::Estimate(
   for (report.num_trials = 0; report.num_trials < max_num_trials && nSigmas > 0;
        ++report.num_trials)
   {
-    sampler.SampleXY(X, Y, &X_rand, &Y_rand);
+    Shuffle(static_cast<uint32_t>(num_samples), &random_indices);
 
+    //sampler.SampleXY(X, Y, &X_rand, &Y_rand);
+    for(size_t j = 0; j < Estimator::kMinNumSamples; ++j)
+    {
+      X_rand[j] = X[random_indices[j]];
+      Y_rand[j] = Y[random_indices[j]];
+    }
     // Estimate model for current subset.
     const std::vector<typename Estimator::M_t> sample_models =
         estimator.Estimate(X_rand, Y_rand);
@@ -399,19 +405,20 @@ LRTsac<Estimator, SupportMeasurer, Sampler>::Estimate(
               options_.max_num_trials);
         }
       }
-      for(int k = nSigmas-1; k >= 0; --k)
+
+    }//end for each model
+    for(int k = nSigmas-1; k >= 0; --k)
+    {
+      size_t itNew = numIterations[k];
+      if(itNew < report.num_trials)
       {
-        size_t itNew = numIterations[k];
-        if(itNew < report.num_trials)
-        {
-          nSigmas--;
-         // std::cout<<"nsigmas "<<nSigmas<<std::endl;
-        }
-        else
-          break;
+        nSigmas--;
+       // std::cout<<"nsigmas "<<nSigmas<<std::endl;
       }
+      else
+        break;
     }
-  }
+  }//end for each iteration
 
 
   report.support = best_support;

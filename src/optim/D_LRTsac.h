@@ -165,7 +165,7 @@ D_LRTsac<Estimator, LocalEstimator, Sampler>::Estimate(
 
   for(int i = 0; i < nSigmas1; ++i)
     for(int j = 0; j < nSigmas2; ++j)
-      p_x[i*nSigmas2+j] = (p_s1[i]*p_s2[j]);
+      p_x[i*nSigmas2+j] = (p_s1[i]*p_s2[j]/(p_s1[i]+p_s2[j]));
 
   std::vector<double> minEps(nSigmas);
   for(int i = 0; i < nSigmas; ++i)
@@ -195,15 +195,22 @@ D_LRTsac<Estimator, LocalEstimator, Sampler>::Estimate(
   sampler.Initialize(num_samples);
 
   size_t max_num_trials = options_.max_num_trials;
-  max_num_trials = std::min<size_t>(max_num_trials, sampler.MaxNumSamples());
+  max_num_trials = std::min<size_t>(iterations(options_.min_inlier_ratio),
+                                    sampler.MaxNumSamples());
 
 
   size_t models_tried = 0;
   for (report.num_trials = 0; report.num_trials < max_num_trials && nSigmas1 > 0;
        ++report.num_trials)
   {
-    sampler.SampleXY(X, Y, &X_rand, &Y_rand);
+    Shuffle(static_cast<uint32_t>(num_samples), &random_indices);
 
+    //sampler.SampleXY(X, Y, &X_rand, &Y_rand);
+    for(size_t j = 0; j < Estimator::kMinNumSamples; ++j)
+    {
+      X_rand[j] = X[random_indices[j]];
+      Y_rand[j] = Y[random_indices[j]];
+    }
     // Estimate model for current minimal subset.
     const std::vector<typename Estimator::M_t> sample_models =
         estimator.Estimate(X_rand, Y_rand);

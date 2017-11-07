@@ -130,7 +130,6 @@ LO_LRTsac<Estimator, LocalEstimator, Sampler>::Estimate(
 
   std::vector<int> random_indices(num_samples);
   std::iota(random_indices.begin(), random_indices.end(), 0);
-  Shuffle(static_cast<uint32_t>(num_samples), &random_indices);
 
   sampler.Initialize(num_samples);
 
@@ -142,8 +141,14 @@ LO_LRTsac<Estimator, LocalEstimator, Sampler>::Estimate(
   for (report.num_trials = 0; report.num_trials < max_num_trials && nSigmas > 0;
        ++report.num_trials)
   {
-    sampler.SampleXY(X, Y, &X_rand, &Y_rand);
+    Shuffle(static_cast<uint32_t>(num_samples), &random_indices);
 
+    //sampler.SampleXY(X, Y, &X_rand, &Y_rand);
+    for(size_t j = 0; j < Estimator::kMinNumSamples; ++j)
+    {
+      X_rand[j] = X[random_indices[j]];
+      Y_rand[j] = Y[random_indices[j]];
+    }
     // Estimate model for current subset.
     const std::vector<typename Estimator::M_t> sample_models =
         estimator.Estimate(X_rand, Y_rand);
@@ -159,7 +164,7 @@ LO_LRTsac<Estimator, LocalEstimator, Sampler>::Estimate(
       bool bailout = false;
       std::vector<int> ks(nSigmas,0);
       std::vector<double> curEps;
-      //for eaLO_LRTsac data point
+      //for each data point
       for(size_t j = 0; j < num_samples; ++j)
       {
         X_test[0] = X[random_indices[j]];
@@ -263,20 +268,19 @@ LO_LRTsac<Estimator, LocalEstimator, Sampler>::Estimate(
           }// end local optimization (if enough inliers)
         }// end if bestk (if a better model was found)
       }//end if !bailout
-
-      // get rid of the sigmas for which we've already done enough iterations
-      for(int k = nSigmas-1; k >= 0; --k)
-      {
-        size_t itNew = numIterations[k];
-        if(itNew < report.num_trials)
-        {
-          nSigmas--;
-          // std::cout<<"nsigmas "<<nSigmas<<std::endl;
-        }
-        else
-          break;
-      }
     }//end for each model
+    // get rid of the sigmas for which we've already done enough iterations
+    for(int k = nSigmas-1; k >= 0; --k)
+    {
+      size_t itNew = numIterations[k];
+      if(itNew < report.num_trials)
+      {
+        nSigmas--;
+        // std::cout<<"nsigmas "<<nSigmas<<std::endl;
+      }
+      else
+        break;
+    }
   }//end for each iteration
 
 

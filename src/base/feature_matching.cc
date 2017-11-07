@@ -920,7 +920,7 @@ void SiftFeatureMatcher::Match(
   // exists_inlier_matches = false;//I'm forcing it to always redo the
   // geometric verification when we do the matching!
     if (exists_matches && exists_inlier_matches) {
-      //continue;
+        continue;
         std::cout<<"they exist!"<<std::endl;
     }
 
