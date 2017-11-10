@@ -194,7 +194,7 @@ D_LRTsac<Estimator, LocalEstimator, Sampler>::Estimate(
 
   sampler.Initialize(num_samples);
 
-  size_t max_num_trials = iterations(options_.min_inlier_ratio);
+ size_t max_num_trials = options_.max_num_trials;
   max_num_trials = std::min<size_t>(max_num_trials, sampler.MaxNumSamples());
 
 
@@ -348,6 +348,8 @@ D_LRTsac<Estimator, LocalEstimator, Sampler>::Estimate(
 //              numIterations[k]=iterations(minEps[k]);
             max_num_trials = std::min(iterations(minEps[bestk]),
                 options_.max_num_trials);
+            if(max_num_trials <= 0)
+              max_num_trials = options_.max_num_trials;
           }// end local optimization (if enough inliers)
         }// end if bestk (if a better model was found)
       }//end if !bailout

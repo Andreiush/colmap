@@ -135,7 +135,8 @@ LO_LRTsac<Estimator, LocalEstimator, Sampler>::Estimate(
 
   size_t max_num_trials = options_.max_num_trials;
   max_num_trials = std::min<size_t>(max_num_trials, sampler.MaxNumSamples());
-
+  if(max_num_trials <= 0)
+    max_num_trials = options_.max_num_trials;
 
   size_t models_tried = 0;
   for (report.num_trials = 0; report.num_trials < max_num_trials && nSigmas > 0;
@@ -265,6 +266,8 @@ LO_LRTsac<Estimator, LocalEstimator, Sampler>::Estimate(
               numIterations[k]=iterations(minEps[k]);
             max_num_trials = std::min(numIterations[std::max(0,bestk-2)],
                 options_.max_num_trials);
+            if(max_num_trials <= 0)
+              max_num_trials = options_.max_num_trials;
           }// end local optimization (if enough inliers)
         }// end if bestk (if a better model was found)
       }//end if !bailout
